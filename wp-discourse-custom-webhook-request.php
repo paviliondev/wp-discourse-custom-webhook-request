@@ -13,6 +13,7 @@ namespace WPDiscourseWebhookRequest;
  * https://developer.wordpress.org/rest-api/
  * http://v2.wp-api.org/extending/adding/
  * https://meta.discourse.org/t/setting-up-webhooks/49045
+ * https://meta.discourse.org/t/how-to-use-discourse-webhooks-with-php/50543
  */
 
 class WPDiscourseWebhookRequest {

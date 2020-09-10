@@ -17,6 +17,8 @@ namespace WPDiscourseWebhookRequest;
  */
 
 class WPDiscourseWebhookRequest {
+	static $group_name = 'test';
+	static $plan_id = '183';
 
 	public function __construct() {
 		// Used to register an endpoint object.
@@ -33,7 +35,7 @@ class WPDiscourseWebhookRequest {
 		 * `register_rest_route` is passed a namespace, a route, and an array of options.
 		 * In this example, the complete URL to be set on Discourse is `http://example.com/wp-json/scossar/v1/example-route`
 		 */
-		register_rest_route( 'scossar/v1', '/example-route', array(
+		register_rest_route( 'products_access/v1', '/update', array(
 			'methods'  => 'POST',
 			'callback' => array( $this, 'process_discourse_request' ),
 		) );
@@ -53,12 +55,14 @@ class WPDiscourseWebhookRequest {
 		$data = $this->verify_discourse_request( $data );
 
 		if ( is_wp_error( $data ) ) {
+
 			error_log( $data->get_error_message() );
 
 			return null;
 		}
-
 		// Do something
+		$payload = $data['usergroup'];
+		$this->update_membership_data($payload);
 
 		$this->write_log( 'Success!' );
 		$json = $data->get_json_params();
@@ -68,6 +72,38 @@ class WPDiscourseWebhookRequest {
 		return 1;
 	}
 
+	protected function update_membership_data($payload) {
+		if($payload['group'] != self::$group_name) return;
+		if(!in_array($payload['type'], array('user_added_to_group', 'user_removed_from_group'))) return;
+
+		$user = get_user_by('email', $payload['user_email']);
+		if(!$user) return;
+
+		$membership = wc_memberships_get_user_membership($user->ID, self::$plan_id);
+		$this->update_user_membership($user, self::$plan_id, $membership, $payload['type']);
+		// $memberships = wc_memberships_get_user_memberships($user->ID);
+
+	}
+
+	protected function update_user_membership($user, $plan_id, $membership, $type) {
+		$pause = ($type == "user_removed_from_group");
+
+		if($membership) {
+			if($pause) {
+				$membership->update_status('delayed');
+			} else {
+				$membership->update_status('active');
+			}
+		} else {
+			if(!$pause) {
+				$args = array(
+					'user_id' => $user->ID,
+					'plan_id' => $plan_id
+				);
+				wc_memberships_create_user_membership($args);
+			}
+		}
+	}
 	/**
 	 * Verify that the request originated from a Discourse webhook and the the secret keys match.
 	 *
